@@ -3,12 +3,18 @@ services:
   etcd:
     image: bitnami/etcd:3.5.17
     container_name: etcd
+    restart: always
     environment:
-      ALLOW_NONE_AUTHENTICATION: yes
+      ALLOW_NONE_AUTHENTICATION: 'yes'
       ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
       ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
     ports:
       - "2379:2379"
+    volumes:
+      - etcd_data:/bitnami/etcd
+    networks:
+      apisix:
+
 
   # APISIX instance
   apisix:
@@ -19,10 +25,15 @@ services:
       - etcd
     volumes:
       - ./apisix_conf/config.yaml:/usr/local/apisix/conf/config.yaml:ro
+    environment:
+      ADMIN_KEY: ${ADMIN_KEY}
     ports:
       - "9080:9080"
       - "9443:9443"
       # - "9091:9091" # APISIX Admin API port (default is 9091)
+    networks:
+      apisix:
+
 
   # APISIX Dashboard
   apisix-dashboard:
@@ -37,3 +48,37 @@ services:
       - ./apisix-dashboard-logs:/usr/local/apisix-dashboard/logs
     ports:
       - "9000:9000"
+
+    networks:
+      apisix:
+
+    
+  prometheus:
+    image: prom/prometheus:v2.25.0
+    restart: always
+    volumes:
+      - ./prometheus_conf/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      apisix:
+
+  grafana:
+    image: grafana/grafana:7.3.7
+    restart: always
+    ports:
+      - "3000:3000"
+    volumes:
+      - "./grafana_conf/provisioning:/etc/grafana/provisioning"
+      - "./grafana_conf/dashboards:/var/lib/grafana/dashboards"
+      - "./grafana_conf/config/grafana.ini:/etc/grafana/grafana.ini"
+    networks:
+      apisix:
+
+networks:
+  apisix:
+    driver: bridge
+
+volumes:
+  etcd_data:
+    driver: local
